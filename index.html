@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>fixapp</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: 'Segoe UI', sans-serif;
+      background:linear-gradient(to right, #1f1c2c, #928dab);
+      color: whitesmoke;
+    }
+    .container {
+      max-width: 400px;
+      margin: 30px auto;
+      background: rgba(0,0,0,0.5);
+      padding: 20px;
+      border-radius: 12px;
+      box-shadow: 0 0 15px rgba(0,0,0,0.3);
+      padding-bottom: 90px;
+    }
+    input, textarea {
+      width: 100%;
+      padding: 10px;
+      margin: 8px 0;
+      border: none;
+      border-radius: 8px;
+      outline: none;
+    }
+    button {
+      padding: 10px 15px;
+      border: none;
+      background: #4caf50;
+      color: white;
+      border-radius: 8px;
+      cursor: pointer;
+      margin-top: 5px;
+    }
+    .hidden { display: none; }
+    .post {
+      background: rgba(255,255,255,0.1);
+      padding: 10px;
+      border-radius: 10px;
+      margin-bottom: 15px;
+    }
+    .comment {
+      font-size: 14px;
+      background: #222;
+      padding: 5px 8px;
+      border-radius: 6px;
+      margin-top: 5px;
+    }
+    .logout {
+      background: #e91e63;
+      float: right;
+    }
+    .tabs-bottom {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      width: 100%;
+      max-width: 400px;
+      display: flex;
+      justify-content: space-around;
+      background: #111;
+      padding: 6px 0;
+      border-top: 1px solid #444;
+      z-index: 100;
+    }
+    .tabs-bottom button {
+      flex: 1;
+      border: none;
+      background: none;
+      color: white;
+      font-size: 14px;
+      cursor: pointer;
+      text-align: center;
+    }
+    .tabs-bottom button.active {
+      background: #333;
+      font-weight: bold;
+      border-top: 2px solid #4caf50;
+    }
+    .tabs-bottom button i {
+      font-size: 20px;
+      margin-bottom: 3px;
+      display: block;
+    }
+    video, img {
+      max-width: 100%;
+      border-radius: 8px;
+      margin-top: 10px;
+    }
+    .profile-pic {
+      width: 80px;
+      height: 80px;
+      border-radius: 50%;
+      object-fit: cover;
+      margin-bottom: 10px;
+    }
+    .user-detail {
+      background: rgba(255,255,255,0.1);
+      padding: 10px;
+      border-radius: 10px;
+      margin: 10px 0;
+    }
+  </style>
+</head>
+<body>
+<div class="container" id="loginPage">
+  <h2>Login / Register</h2>
+  <input type="text" id="loginUsername" placeholder="Username">
+  <input type="password" id="loginPassword" placeholder="Password">
+  <label>Upload Profile Pic: <input type="file" id="profilePic" accept="image/*"></label>
+  <button onclick="login()">Login / Register</button>
+</div>
+
+<div class="container hidden" id="mainApp">
+  <div id="homePage">
+    <h3>Create Post</h3>
+    <textarea id="postText" placeholder="What's on your mind?"></textarea>
+    <input type="file" id="mediaFile" accept="image/*,video/*">
+    <button onclick="createPost()">Post</button>
+    <h3>Feed</h3>
+    <div id="feed"></div>
+  </div>
+
+  <div id="accountPage" class="hidden">
+    <h3>My Account</h3>
+    <img id="userProfilePic" class="profile-pic" src="" alt="Profile">
+    <div class="user-detail">
+      <p><strong>Username:</strong> <span id="currentUserDisplay"></span></p>
+      <input type="text" id="editUsername" placeholder="New Username">
+      <input type="file" id="editProfilePic" accept="image/*">
+      <button onclick="updateUsername()">Update</button>
+      <button class="logout" onclick="logout()">Logout</button>
+    </div>
+  </div>
+
+  <div id="searchPage" class="hidden">
+    <h3>Search</h3>
+    <input type="text" id="searchBox" placeholder="Search..." onkeyup="searchFeed()">
+    <div id="searchResults"></div>
+  </div>
+
+  <div id="notificationPage" class="hidden">
+    <h3>Notifications</h3>
+    <p>No new notifications yet.</p>
+  </div>
+</div>
+
+<div class="tabs-bottom hidden" id="navBar">
+  <button id="homeBtn" class="active" onclick="showPage('home')">
+    <i class="fas fa-home"></i><div style="font-size:12px;">Home</div>
+  </button>
+  <button id="searchBtn" onclick="showPage('search')">
+    <i class="fas fa-search"></i><div style="font-size:12px;">Search</div>
+  </button>
+  <button id="addBtn" onclick="showPage('home'); document.getElementById('postText').focus();">
+    <i class="fas fa-plus-circle"></i><div style="font-size:12px;">Post</div>
+  </button>
+  <button id="notifyBtn" onclick="showPage('notify')">
+    <i class="fas fa-bell"></i><div style="font-size:12px;">Alerts</div>
+  </button>
+  <button id="accountBtn" onclick="showPage('account')">
+    <i class="fas fa-user"></i><div style="font-size:12px;">Account</div>
+  </button>
+</div>
+
+<script>
+  let currentUser = '';
+  let userPic = '';
+  let posts = [];
+
+  window.onload = () => {
+    const user = localStorage.getItem('socialUser');
+    const pic = localStorage.getItem('socialUserPic');
+    const savedPosts = JSON.parse(localStorage.getItem('fixapp_posts'));
+    if (savedPosts && Array.isArray(savedPosts)) {
+      posts = savedPosts;
+    }
+    if (user) {
+      currentUser = user;
+      userPic = pic || '';
+      showMainApp();
+    }
+  };
+
+  function login() {
+    const username = document.getElementById('loginUsername').value.trim();
+    const password = document.getElementById('loginPassword').value.trim();
+    const picInput = document.getElementById('profilePic');
+    if (!username || !password) return alert("Please enter credentials");
+    if (picInput.files.length > 0) {
+      const reader = new FileReader();
+      reader.onload = () => {
+        userPic = reader.result;
+        localStorage.setItem('socialUserPic', userPic);
+        completeLogin(username);
+      };
+      reader.readAsDataURL(picInput.files[0]);
+    } else {
+      completeLogin(username);
+    }
+  }
+
+  function completeLogin(username) {
+    localStorage.setItem('socialUser', username);
+    currentUser = username;
+    showMainApp();
+  }
+
+  function showMainApp() {
+    document.getElementById('loginPage').classList.add('hidden');
+    document.getElementById('mainApp').classList.remove('hidden');
+    document.getElementById('navBar').classList.remove('hidden');
+    document.getElementById('currentUserDisplay').textContent = currentUser;
+    if (userPic) {
+      document.getElementById('userProfilePic').src = userPic;
+    }
+    loadFeed();
+  }
+
+  function updateUsername() {
+    const newName = document.getElementById('editUsername').value.trim();
+    const picInput = document.getElementById('editProfilePic');
+    if (newName) {
+      currentUser = newName;
+      localStorage.setItem('socialUser', newName);
+      document.getElementById('currentUserDisplay').textContent = newName;
+    }
+    if (picInput.files.length > 0) {
+      const reader = new FileReader();
+      reader.onload = () => {
+        userPic = reader.result;
+        localStorage.setItem('socialUserPic', userPic);
+        document.getElementById('userProfilePic').src = userPic;
+      };
+      reader.readAsDataURL(picInput.files[0]);
+    }
+    alert("Account updated!");
+  }
+
+  function logout() {
+    localStorage.removeItem('socialUser');
+    localStorage.removeItem('socialUserPic');
+    // localStorage.removeItem('fixapp_posts'); // Uncomment this if you want to delete posts on logout
+    location.reload();
+  }
+
+  function showPage(page) {
+    document.querySelectorAll('.tabs-bottom button').forEach(btn => btn.classList.remove('active'));
+    document.getElementById('homePage').classList.add('hidden');
+    document.getElementById('accountPage').classList.add('hidden');
+    document.getElementById('searchPage').classList.add('hidden');
+    document.getElementById('notificationPage').classList.add('hidden');
+    if (page === 'home') {
+      document.getElementById('homePage').classList.remove('hidden');
+      document.getElementById('homeBtn').classList.add('active');
+    } else if (page === 'account') {
+      document.getElementById('accountPage').classList.remove('hidden');
+      document.getElementById('accountBtn').classList.add('active');
+    } else if (page === 'search') {
+      document.getElementById('searchPage').classList.remove('hidden');
+      document.getElementById('searchBtn').classList.add('active');
+    } else if (page === 'notify') {
+      document.getElementById('notificationPage').classList.remove('hidden');
+      document.getElementById('notifyBtn').classList.add('active');
+    }
+  }
+
+  function createPost() {
+    const text = document.getElementById('postText').value;
+    const file = document.getElementById('mediaFile').files[0];
+    let media = '';
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = function() {
+        media = reader.result;
+        addPost(text, media, file.type);
+      }
+      reader.readAsDataURL(file);
+    } else {
+      addPost(text, '', '');
+    }
+  }
+
+  function addPost(text, media, type) {
+    const post = { user: currentUser, text, media, type };
+    posts.unshift(post);
+    localStorage.setItem('fixapp_posts', JSON.stringify(posts));
+    loadFeed();
+    document.getElementById('postText').value = '';
+    document.getElementById('mediaFile').value = '';
+  }
+
+  function loadFeed() {
+    const feed = document.getElementById('feed');
+    feed.innerHTML = posts.map(p => `
+      <div class="post">
+        <strong>${p.user}</strong>
+        <p>${p.text}</p>
+        ${p.media ? (p.type.startsWith('video') ? `<video controls src="${p.media}"></video>` : `<img src="${p.media}">`) : ''}
+      </div>
+    `).join('');
+  }
+
+  function searchFeed() {
+    const term = document.getElementById('searchBox').value.toLowerCase();
+    const results = posts.filter(p => p.text.toLowerCase().includes(term) || p.user.toLowerCase().includes(term));
+    const out = document.getElementById('searchResults');
+    out.innerHTML = results.map(p => `
+      <div class="post">
+        <strong>${p.user}</strong>
+        <p>${p.text}</p>
+        ${p.media ? (p.type.startsWith('video') ? `<video controls src="${p.media}"></video>` : `<img src="${p.media}">`) : ''}
+      </div>
+    `).join('');
+  }
+</script>
+</body>
+</html>
